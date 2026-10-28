@@ -10,7 +10,7 @@
   "scripts": {
     "start": "npm run helper && electron .",
     "dist": "npm run helper && electron-builder --mac dmg",
-    "helper": "swiftc -O app/dockwatch.swift -o build/dockwatch"
+    "helper": "swiftc -O app/helper.swift -o build/helper"
   },
   "build": {
     "appId": "io.github.ashub98-png.daruma-desk",
@@ -42,8 +42,8 @@
     },
     "extraResources": [
       {
-        "from": "build/dockwatch",
-        "to": "dockwatch"
+        "from": "build/helper",
+        "to": "helper"
       }
     ]
   },

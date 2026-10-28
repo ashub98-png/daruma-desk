@@ -16,10 +16,10 @@ const SNAPSHOT = process.env.DARUMA_SNAPSHOT;   // a test run: render, save a ca
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 if (SNAPSHOT) app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'daruma-')));
 
-let win = null, plate = null, tray = null, lastInset = '', shown = { dock: true, bar: true };
+let win = null, helper = null, tray = null, lastInset = '', shown = { dock: true, bar: true };
 
 // The room the Dock and the menu bar take at the screen's edges, or none for whichever is hidden right now:
-// the work area keeps room for them even in a full-screen space, so dockwatch reports what is on screen
+// the work area keeps room for them even in a full-screen space, so the helper reports what is on screen
 function inset() {
   const d = screen.getPrimaryDisplay(), b = d.bounds, a = d.workArea;
   const v = { top: a.y - b.y, bottom: b.y + b.height - (a.y + a.height), left: a.x - b.x, right: b.x + b.width - (a.x + a.width) };
@@ -27,10 +27,11 @@ function inset() {
   if (!shown.bar) v.top = 0;
   return v;
 }
-function watchDock() {
-  const bin = app.isPackaged ? path.join(process.resourcesPath, 'dockwatch') : path.join(ROOT, 'build', 'dockwatch');
-  if (!fs.existsSync(bin)) return;   // without it, the dolls keep to the work area
-  const p = spawn(bin, [], { stdio: ['ignore', 'pipe', 'ignore'] });
+// helper.swift: it watches the Dock, and draws the frosted patch behind the gate
+function startHelper() {
+  const bin = app.isPackaged ? path.join(process.resourcesPath, 'helper') : path.join(ROOT, 'build', 'helper');
+  if (!fs.existsSync(bin)) return;   // without it the dolls keep to the work area, with nothing frosted
+  const p = helper = spawn(bin, [], { stdio: ['pipe', 'pipe', 'ignore'] });
   let buf = '';
   p.stdout.on('data', chunk => {
     buf += chunk;
@@ -77,17 +78,6 @@ function createWindow() {
   setInterval(watchInset, 1000);
   for (const ev of ['display-metrics-changed', 'display-added', 'display-removed']) screen.on(ev, refit);
   win.on('closed', () => { win = null; });
-  // A small frosted panel just under the window, behind the gate, so what is beneath it is blurred away.
-  // macOS draws the blur itself; a page cannot blur what lies outside its window.
-  plate = new BrowserWindow({
-    width: 96, height: 62, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false, roundedCorners: true,
-    resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false, focusable: false,
-    skipTaskbar: true, show: false, vibrancy: 'popover', visualEffectState: 'active',
-  });
-  plate.setIgnoreMouseEvents(true);
-  plate.setAlwaysOnTop(true, 'floating', -1);   // one step below the dolls' window
-  plate.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  plate.loadURL('data:text/html,<body style="margin:0;background:transparent"></body>');
   if (SNAPSHOT) snapshot();
 }
 
@@ -131,10 +121,9 @@ function makeTray() {
 
 ipcMain.on('inset', e => { e.returnValue = inset(); lastInset = JSON.stringify(e.returnValue); });
 ipcMain.on('plate', (e, r) => {
-  if (!plate || plate.isDestroyed() || !win) return;
+  if (!helper || !win) return;
   const o = win.getBounds();
-  plate.setBounds({ x: Math.round(o.x + r.x), y: Math.round(o.y + r.y), width: Math.round(r.w), height: Math.round(r.h) });
-  if (!plate.isVisible()) plate.showInactive();
+  helper.stdin.write(`plate ${Math.round(o.x + r.x)} ${Math.round(o.y + r.y)} ${Math.round(r.w)} ${Math.round(r.h)}\n`);
 });
 ipcMain.on('click-through', (e, on) => { if (win) win.setIgnoreMouseEvents(!!on, { forward: true }); });
 
@@ -146,7 +135,7 @@ else {
     // no menu bar shows, but the Edit menu is what makes copy and paste work in the pledge field
     Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]));
     serve();
-    watchDock();
+    startHelper();
     createWindow();
     if (!SNAPSHOT) makeTray();
   });
