@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Daruma Desk</title>
+<script>if (window.darumaApp) document.documentElement.classList.add('in-app');</script>
 <style>
   :root {
     --ink: #1d1d1f;
@@ -58,8 +59,8 @@
   #deskGL { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 20; pointer-events: none; }
   #hits { position: fixed; inset: 0; z-index: 21; pointer-events: none; }
   .hit {
-    position: absolute; left: 0; top: 0; width: 48px; height: 56px; padding: 0; border: 0; background: none;
-    border-radius: 24px 24px 18px 18px; cursor: grab; pointer-events: auto; touch-action: none;
+    position: absolute; left: 0; top: 0; width: 40px; height: 48px; padding: 0; border: 0; background: none;
+    border-radius: 20px 20px 15px 15px; cursor: grab; pointer-events: auto; touch-action: none;
   }
   .hit:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 
@@ -84,9 +85,10 @@
   .btn.icon.armed .lbl { display: inline; font: 600 12.5px var(--font); }
 
   /* ---------- Launcher: the 3D torii is drawn in the desk canvas ---------- */
-  .launcher { position: fixed; left: 6px; bottom: 6px; z-index: 30; }
+  .launcher { position: fixed; left: 6px; bottom: 0; z-index: 30; }
+  .launcher.right .menu { left: auto; right: 4px; transform-origin: calc(100% - 30px) 100%; }
   .launch {
-    display: block; width: 96px; height: 66px; padding: 0; border: 0; border-radius: 16px; background: none; cursor: pointer;
+    display: block; width: 84px; height: 58px; padding: 0; border: 0; border-radius: 16px; background: none; cursor: pointer;
   }
   .launch:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .menu {
@@ -262,6 +264,12 @@
     opacity: 0; transition: opacity .12s ease;
   }
   .hall-tip.show { opacity: 1; }
+
+  /* ---------- In the desktop app the real desktop shows through ---------- */
+  .in-app body { background: transparent; }
+  .in-app .desktop { display: none; }
+  .in-app .scrim, .in-app .hall { inset: 0; }
+  .in-app .glow { mix-blend-mode: normal; opacity: .35; }
 
   @media (max-width: 640px) {
     .hall { padding: 0; }
@@ -1180,10 +1188,10 @@ class Fireworks {
 /* =====================================================================
    Desk overlay: dolls resting on the bottom edge of the screen
    ===================================================================== */
-const DOLL_H = 52;
+const DOLL_H = 44;
 const S = DOLL_H / BODY_H;
-const BASE_Y = 12;
-const GAP = 54;                          // minimum distance between resting dolls
+const BASE_Y = 6;
+const GAP = 46;                          // minimum distance between resting dolls
 const HEAD = (BODY_H - ROLL_R) * .92;    // rocking centre to the top of the head, body units
 const deskR = setupRenderer($('#deskGL'), { alpha: true });
 deskR.setClearColor(0x000000, 0);
@@ -1200,9 +1208,12 @@ const fireworks = new Fireworks(deskScene);
 let W = innerWidth, H = innerHeight, deskDirty = true;
 const falling = [];   // parachutes collapsing after a landing
 
-// The way into the hall: a small shrine at the left end of the row
-const GATE_YAW = 0;
-const gate = { group: makeShrine(), x: 54, s: 46, k: 1, kT: 1, yaw: GATE_YAW, yawV: 0, dth: 0, dom: 0 };
+// The way into the hall: a small shrine in a bottom corner, at the start of the row.
+// It can be dragged to either corner; the row then runs from that side.
+const GATE_YAW = 0, GATE_IN = 48;
+const gate = { group: makeShrine(), x: GATE_IN, vx: 0, s: 40, k: 1, kT: 1, yaw: GATE_YAW, yawV: 0, dth: 0, dom: 0, side: state.side === 'right' ? 'right' : 'left', drag: null };
+gate.home = () => gate.side === 'left' ? GATE_IN : W - GATE_IN;
+gate.dir = () => gate.side === 'left' ? 1 : -1;
 gate.doll = gate.group.userData.doll;
 gate.shadow = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ map: BLOB, transparent: true, depthWrite: false, toneMapped: false, opacity: .75 }));
 gate.shadow.renderOrder = -1;
@@ -1214,6 +1225,8 @@ function placeGate() {
   gate.doll.group.rotation.z = gate.dth;
   gate.shadow.position.set(gate.x, BASE_Y + 1, -14);
   gate.shadow.scale.set(gate.s * 2.1, gate.s * .32, 1);
+  const x = Math.round(gate.x);
+  if (x !== gate.px) { gate.px = x; launcher.style.left = (x - 42) + 'px'; placeGlow(); }
 }
 // a soft lift of the wallpaper behind the gate, blended into it rather than painted over it
 function placeGlow() {
@@ -1237,8 +1250,11 @@ function resizeDesk() {
 const desk = new Map();
 const hits = $('#hits');
 const launchBtn = $('#launch');
-const xMin = () => gate.x + gate.s * .85 + 10 + S * .5;
-const xMax = () => Math.max(xMin(), W - 16 - S * .5);
+// the row runs from beside the gate's corner towards the far edge
+const rowNear = () => gate.home() + gate.dir() * (gate.s * .85 + 10 + S * .5);
+const rowFar = () => gate.side === 'left' ? Math.max(rowNear(), W - 16 - S * .5) : Math.min(rowNear(), 16 + S * .5);
+const xMin = () => Math.min(rowNear(), rowFar());
+const xMax = () => Math.max(rowNear(), rowFar());
 
 // The dolls stand in one row from the gate with no gaps. A doll that is being
 // carried or is coming down keeps a space open where it would land, so the
@@ -1248,10 +1264,11 @@ const AIRBORNE = ['drag', 'chute', 'fall'];
 const airX = d => d.chute ? d.chute.x : d.hang ? d.hang.x : d.x;
 function pack(persist = true) {
   const all = [...desk.values()];
-  const row = all.filter(d => IN_ROW.includes(d.mode)).sort((a, b) => a.tx - b.tx);
+  const dir = gate.dir();   // order from the gate outwards, which keeps their order on screen when the gate changes sides
+  const row = all.filter(d => IN_ROW.includes(d.mode)).sort((a, b) => dir * (a.tx - b.tx));
   const air = all.filter(d => AIRBORNE.includes(d.mode));
-  const n = row.length + air.length, x0 = xMin();
-  const step = n > 1 ? Math.min(GAP, (xMax() - x0) / (n - 1)) : GAP;
+  const n = row.length + air.length, x0 = rowNear();
+  const step = dir * (n > 1 ? Math.min(GAP, (xMax() - xMin()) / (n - 1)) : GAP);
   for (const d of air) {   // with a little hysteresis, so the space does not flicker between two spots
     const f = (airX(d) - x0) / step;
     if (d.ins === undefined || Math.abs(f - d.ins) > .65) d.ins = Math.round(f);
@@ -1260,9 +1277,12 @@ function pack(persist = true) {
   air.sort((a, b) => a.ins - b.ins).forEach(d => row.splice(Math.min(d.ins, row.length), 0, d));
   row.forEach((d, i) => {
     d.slot = x0 + i * step;
-    d.z = step < GAP * .9 && !AIRBORNE.includes(d.mode) ? -(i % 2) * 44 : 0;   // a crowded row staggers in depth
+    d.z = Math.abs(step) < GAP * .9 && !AIRBORNE.includes(d.mode) ? -(i % 2) * 38 : 0;   // a crowded row staggers in depth
     if (d.mode === 'roll') retarget(d, d.slot);
-    else if (!AIRBORNE.includes(d.mode)) d.tx = d.slot;
+    else if (!AIRBORNE.includes(d.mode)) {
+      d.tx = d.slot;
+      if (d.mode === 'idle' && !REDUCED && Math.abs(d.x - d.tx) > 160) rollTo(d);   // a long way, as when the gate moves sides: it rolls
+    }
   });
   if (persist) {
     for (const d of row) { const p = state.active.find(a => a.id === d.id); if (p) p.x = Math.round(d.slot); }
@@ -1286,7 +1306,7 @@ function addDeskDoll(p, drop) {
   hits.appendChild(hit);
   // a saved x keeps the doll's place in the row; a new doll joins the end
   const d = {
-    id: p.id, doll, shadow, hit, x: 0, tx: typeof p.x === 'number' ? p.x : Infinity, y: drop ? BASE_Y + 150 : BASE_Y,
+    id: p.id, doll, shadow, hit, x: typeof p.x === 'number' ? p.x : 0, tx: typeof p.x === 'number' ? p.x : Infinity, y: drop ? BASE_Y + 150 : BASE_Y,
     vx: 0, vy: 0, th: 0, om: 0, z: 0, zc: 0,
     k: drop ? .7 : 1, mode: drop ? 'drop' : 'idle', nudge: rand(6, 20), spin: 0, hops: 0, hang: null, press: null,
   };
@@ -1334,7 +1354,7 @@ function place(d) {
   // the button follows the doll on screen (a doll set back in a crowded row looks a touch smaller and higher)
   const pz = deskCam.position.z / (deskCam.position.z - d.zc);
   const sx = W / 2 + (g.position.x - W / 2) * pz, sy = H / 2 + (g.position.y + (BODY_H / 2 - ROLL_R) * s - H / 2) * pz;
-  const hx = Math.round(sx - 24), hy = Math.round(H - sy - 28);
+  const hx = Math.round(sx - 20), hy = Math.round(H - sy - 24);
   if (hx !== d.hx || hy !== d.hy) { d.hx = hx; d.hy = hy; d.hit.style.transform = `translate(${hx}px, ${hy}px)`; }
   if (d.id === cardId) placeCard(d);
 }
@@ -1477,16 +1497,18 @@ function land(d) {
 // slides over, from further away (past the end of the row) it rolls there
 function toSlot(d) {
   d.tx = d.slot ?? d.x; d.ins = undefined;
-  const dist = d.x - d.tx;   // positive: towards the gate
-  if (!REDUCED && Math.abs(dist) >= 80) {
-    const turns = Math.sign(dist) * Math.max(1, Math.round(Math.abs(dist) / (Math.PI * BODY_H * S)));
-    // switch to rolling about the centre without a visible jump
-    const s = S * d.k, x0 = d.x - ROLL_R * s * d.th - Math.sin(d.th) * (BODY_H / 2 - ROLL_R) * s;
-    d.mode = 'roll'; d.om = 0; d.vx = 0; d.x = x0;
-    d.roll = { t: 0, x0, x1: d.tx, th0: d.th, dur: clamp(Math.abs(dist) / 300 + .35, .45, 2.4), turns };
-    for (const f of falling) if (f.d === d) { f.cut = true; f.t = Math.max(f.t, .45); }   // let go of the canopy
-  }
+  if (!REDUCED && Math.abs(d.x - d.tx) >= 80) rollTo(d);
   pack();
+}
+function rollTo(d) {
+  const dist = d.x - d.tx;   // positive: leftwards
+  const turns = Math.sign(dist) * Math.max(1, Math.round(Math.abs(dist) / (Math.PI * BODY_H * S)));
+  // switch to rolling about the centre without a visible jump
+  const s = S * d.k, x0 = d.x - ROLL_R * s * d.th - Math.sin(d.th) * (BODY_H / 2 - ROLL_R) * s;
+  d.mode = 'roll'; d.om = 0; d.vx = 0; d.x = x0;
+  d.roll = { t: 0, x0, x1: d.tx, th0: d.th, dur: clamp(Math.abs(dist) / 300 + .35, .45, 2.4), turns };
+  for (const f of falling) if (f.d === d) { f.cut = true; f.t = Math.max(f.t, .45); }   // let go of the canopy
+  if (cardId === d.id) hideCard();
 }
 const rollEase = t => t < .5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 // steer a rolling doll to a new space without a jump
@@ -1609,6 +1631,13 @@ function updateDesk(dt) {
   for (const d of [...desk.values()]) if (stepDoll(d, dt)) active = true;
   if (falling.length) { updateFalling(dt); active = true; }
   gate.k += (gate.kT - gate.k) * Math.min(1, dt * 12);
+  const gx = gate.drag ? gate.drag.x : gate.home();
+  if (Math.abs(gx - gate.x) > .05 || Math.abs(gate.vx) > .05) {
+    const ax = 120 * (gx - gate.x) - 22 * gate.vx;
+    gate.vx += ax * dt; gate.x += gate.vx * dt;
+    gate.dom += ax * 3e-4 * dt;   // the little doll under the gate sways as it goes
+    active = true;
+  }
   gate.yawV += (-34 * (gate.yaw - GATE_YAW) - 4.5 * gate.yawV) * dt;
   gate.yaw += gate.yawV * dt;
   gate.dom += (-40 * gate.dth - 3.2 * gate.dom) * dt;
@@ -1731,7 +1760,38 @@ launcher.addEventListener('mouseenter', () => { clearTimeout(menuT); menuT = set
 launcher.addEventListener('mouseleave', () => { clearTimeout(menuT); menuT = setTimeout(() => setMenu(false), 240); });
 launcher.addEventListener('focusout', e => { if (!launcher.contains(e.relatedTarget)) setMenu(false); });
 launcher.addEventListener('mousedown', e => e.preventDefault());
+// drag the gate along the bottom and let go: it settles in the nearer corner and the row follows
+launchBtn.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  launchBtn.setPointerCapture(e.pointerId);
+  gate.press = { x: e.clientX, id: e.pointerId };
+});
+launchBtn.addEventListener('pointermove', e => {
+  const pr = gate.press;
+  if (!pr || pr.id !== e.pointerId) return;
+  if (!gate.drag) {
+    if (Math.abs(e.clientX - pr.x) < 6) return;
+    gate.drag = { x: gate.x, off: gate.x - e.clientX };
+    setMenu(false); document.body.classList.add('dragging');
+  }
+  gate.drag.x = clamp(e.clientX + gate.drag.off, GATE_IN, W - GATE_IN);
+  deskDirty = true;
+});
+const dropGate = e => {
+  if (!gate.press || gate.press.id !== e.pointerId) return;
+  gate.press = null;
+  if (!gate.drag) return;
+  const side = gate.drag.x < W / 2 ? 'left' : 'right';
+  gate.drag = null; gate.dragged = true;
+  document.body.classList.remove('dragging');
+  if (side !== gate.side) { gate.side = side; state.side = side; launcher.classList.toggle('right', side === 'right'); pack(); }
+  deskDirty = true;
+};
+launchBtn.addEventListener('pointerup', dropGate);
+launchBtn.addEventListener('pointercancel', dropGate);
+launcher.classList.toggle('right', gate.side === 'right');
 launchBtn.addEventListener('click', e => {
+  if (gate.dragged) { gate.dragged = false; return; }   // that was a drag, not a click
   if (e.detail > 0 && matchMedia('(hover: hover)').matches) { setMenu(true); return; }
   if (menuOpen && performance.now() - openedAt < 450) return;
   setMenu(!menuOpen);
@@ -2471,11 +2531,11 @@ addEventListener('resize', () => {
   if (Hall.isOpen()) deskR.render(deskScene, deskCam);
 });
 resizeDesk();
+gate.x = gate.home();
 placeGate();
-placeGlow();
 for (const p of state.active) addDeskDoll(p, false);
 pack(false);
-for (const d of desk.values()) { d.x = d.tx; d.zc = d.z; }
+for (const d of desk.values()) { if (d.roll) { d.roll = null; d.mode = 'idle'; d.th = 0; } d.x = d.tx; d.zc = d.z; }   // saved dolls start in place
 updateCounts();
 (window.requestIdleCallback || (f => setTimeout(f, 800)))(() => fillIllustrations());
 
@@ -2487,6 +2547,24 @@ requestAnimationFrame(function loop(now) {
   Hall.update(dt);
   requestAnimationFrame(loop);
 });
+
+// In the desktop app the window covers the screen, so it lets clicks through to the desktop
+// except over the dolls, the gate and whatever is open
+const shell = window.darumaApp;
+if (shell) {
+  let through = true, mx = -1, my = -1;
+  const check = () => {
+    // the window floats over other apps without taking focus, so it should never look like it holds a focused control
+    if (!document.hasFocus() && !composeOpen && !Hall.isOpen() && document.activeElement !== document.body) document.activeElement.blur();
+    const el = mx < 0 ? null : document.elementFromPoint(mx, my);
+    const solid = composeOpen || Hall.isOpen() || menuOpen || document.body.classList.contains('dragging') ||
+      [...desk.values()].some(d => d.press) || !!(el && el.closest('.hit, .launcher, .card.show'));
+    if (solid === through) { through = !solid; shell.clickThrough(through); }
+  };
+  addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; check(); }, true);
+  setInterval(check, 250);
+  shell.onCommand(name => { if (name === 'new') openCompose(); else if (name === 'hall') Hall.open(); });
+}
 
 window.__daruma = {
   get state() { return state; }, Hall, openCompose, addTask, complete,

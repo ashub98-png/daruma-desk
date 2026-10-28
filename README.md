@@ -9,6 +9,18 @@ Write a pledge and a doll comes down to rest at the bottom of your screen with o
 - The dolls always stand in one row beside the gate
 - The Hall of Dolls: walnut ledges with falling petals; pick a doll to read its pledge
 
+## Desktop app (macOS)
+
+The app floats the dolls on the bottom edge of your screen, over other windows and full-screen apps, and lets clicks pass through everywhere else. It lives in the menu bar (New Doll, View Hall of Dolls, Open at Login, Quit). Drag the gate to the bottom-left or bottom-right corner and the row follows it.
+
+```bash
+npm install
+npm start          # run it
+npm run dist       # build dist/Daruma Desk-<version>-arm64.dmg
+```
+
+The build is ad-hoc signed, not notarized: it opens normally on the Mac that built it; on another Mac, right-click the app and choose Open the first time.
+
 ## Run the prototype
 
 Open `index.html` in Chrome or Safari. Pledges are saved in the browser's local storage.

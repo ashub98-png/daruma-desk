@@ -1,0 +1,47 @@
+{
+  "name": "daruma-desk",
+  "productName": "Daruma Desk",
+  "version": "1.0.0",
+  "description": "A to-do reminder that lives on your desktop as daruma dolls",
+  "author": "Himanshu Bhardwaj",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac dmg"
+  },
+  "build": {
+    "appId": "io.github.ashub98-png.daruma-desk",
+    "productName": "Daruma Desk",
+    "files": [
+      "index.html",
+      "app/**",
+      "vendor/**"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "LSUIElement": true
+      },
+      "identity": "-",
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "Daruma Desk"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0"
+  }
+}
