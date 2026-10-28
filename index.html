@@ -775,6 +775,319 @@ class Doll {
 }
 
 /* =====================================================================
+   A broken task: one tear runs down from the painted eye, a crack runs
+   down the doll, and the hollow shell falls open in two
+   ===================================================================== */
+// the body's radius at height y, read off the lathe profile
+function radiusAt(y) {
+  for (let i = 1; i < PROFILE.length; i++) {
+    const a = PROFILE[i - 1], b = PROFILE[i];
+    if (b.y >= y) return a.x + (b.x - a.x) * clamp((y - a.y) / Math.max(1e-6, b.y - a.y), 0, 1);
+  }
+  return 0;
+}
+// the point on the front of the body at (x, y), and the outward normal there
+function onBody(x, y, p, n) {
+  const r = Math.max(radiusAt(y), 1e-3), z = Math.sqrt(Math.max(0, r * r - x * x));
+  p.set(x, y, z);
+  n.set(x / r, -(radiusAt(y + .005) - radiusAt(y - .005)) / .01, z / r).normalize();
+}
+// a drop one unit wide and tall, round below and drawn to a point above
+const TEAR_GEO = (() => {
+  const pts = [];
+  for (let i = 24; i >= 0; i--) {
+    const t = Math.PI * i / 24;
+    pts.push(new THREE.Vector2(.73 * Math.sin(t) * Math.pow(Math.sin(t / 2), 1.6), .5 * Math.cos(t)));
+  }
+  return new THREE.LatheGeometry(pts, 20);
+})();
+
+// The line the doll breaks along, as points (x, y) in body units from the base up: a jagged path down
+// the front, between the eyes, and another up the back, the two meeting at the crown and the base
+function crackLine() {
+  const line = (x0, amp) => {
+    const k = [new THREE.Vector2(0, 0)];
+    let x = x0, y = 0, side = Math.random() < .5 ? 1 : -1;
+    // jags of uneven length and depth: mostly a zigzag, now and then a longer run one way
+    while ((y += rand(.024, .075)) < BODY_H - .03) {
+      if (Math.random() < .7) side = -side;
+      x = clamp(x + side * rand(.014, .048), x0 - amp, x0 + amp);
+      k.push(new THREE.Vector2(x * Math.min(1, radiusAt(y) / .26), y));   // closing in to meet at the crown and the base
+    }
+    k.push(new THREE.Vector2(0, BODY_H));
+    return k;
+  };
+  return { front: line(-.01, .05), back: line(0, .055) };
+}
+// x on a crack line at height y
+function crackAt(k, y) {
+  for (let i = 1; i < k.length; i++) if (k[i].y >= y) {
+    const a = k[i - 1], b = k[i];
+    return a.x + (b.x - a.x) * clamp((y - a.y) / Math.max(1e-6, b.y - a.y), 0, 1);
+  }
+  return 0;
+}
+
+const SHELL = .03;   // the papier-mâché wall, in body units
+// One half of the hollow shell, broken along the crack: s = 1 the viewer's right, -1 the left. Its broken
+// edges lie exactly on the crack. Groups: 0 the painted lacquer on the front, 1 the plain lacquer on the back,
+// 2 the bare paper inside, 3 the raw edge of the wall. Centred on the rocking centre, so it rocks as the doll does.
+function halfShell(s, crack) {
+  const ys = [...new Set([...PROFILE.map(p => p.y), ...crack.front.map(k => k.y), ...crack.back.map(k => k.y)]
+    .map(y => Math.round(y * 1e5) / 1e5))].sort((a, b) => a - b);
+  // where the crack crosses each ring, front and back, as angles round from the front towards the viewer's right
+  const cut = ys.map(y => {
+    const r = radiusAt(y);
+    if (r < 1e-4) return [0, Math.PI];
+    return [Math.asin(clamp(crackAt(crack.front, y) / r, -.95, .95)), Math.PI - Math.asin(clamp(crackAt(crack.back, y) / r, -.95, .95))];
+  });
+  const Q = Math.PI / 2;
+  // each half is swept round from one side of the break to the other, split where the front meets the back
+  const sweeps = s > 0 ? [[0, i => cut[i][0], () => Q], [1, () => Q, i => cut[i][1]]]
+                       : [[1, i => cut[i][1], () => 3 * Q], [0, () => 3 * Q, i => cut[i][0] + 4 * Q]];
+  const edges = s > 0 ? [[i => cut[i][0], -1], [i => cut[i][1], 1]] : [[i => cut[i][1], -1], [i => cut[i][0] + 4 * Q, 1]];
+  const pos = [], nor = [], uv = [], col = [], idx = [], geo = new THREE.BufferGeometry();
+  const P = new THREE.Vector3(), N = new THREE.Vector3(), T = new THREE.Vector3();
+  const skin = (phi, y) => {   // the outside at angle phi round from the front, and its normal
+    const r = radiusAt(y);
+    P.set(r * Math.sin(phi), y, r * Math.cos(phi));
+    N.set(Math.sin(phi), -(radiusAt(y + .004) - radiusAt(y - .004)) / .008, Math.cos(phi)).normalize();
+  };
+  const vert = (p, n, inside) => {   // the inside of the hollow grows darker towards the base
+    pos.push(p.x, p.y - ROLL_R, p.z); nor.push(n.x, n.y, n.z); uv.push(p.x / SPAN + .5, p.y / SPAN);
+    const ao = inside ? .3 + .6 * smooth(0, .7, p.y) : .6 + .4 * smooth(0, .34, p.y);
+    col.push(ao, ao, ao);
+  };
+  const C = 26, ring = C + 1;
+  for (const [mat, a0, a1] of sweeps) for (const inside of [false, true]) {
+    // the lacquer outside, then the paper inside: the same rings pushed in through the wall, facing in
+    const from = idx.length, base = pos.length / 3;
+    for (let i = 0; i < ys.length; i++) for (let j = 0; j <= C; j++) {
+      skin(a0(i) + (a1(i) - a0(i)) * j / C, ys[i]);
+      if (inside) { P.addScaledVector(N, -SHELL); N.negate(); }
+      vert(P, N, inside);
+    }
+    for (let i = 0; i < ys.length - 1; i++) for (let j = 0; j < C; j++) {
+      const a = base + i * ring + j, b = a + 1, c = b + ring, d = a + ring;
+      if (inside) idx.push(a, c, b, a, d, c); else idx.push(a, b, c, a, c, d);
+    }
+    geo.addGroup(from, idx.length - from, inside ? 2 : mat);
+  }
+  // the raw edge of the wall along both sides of the break, facing out of it
+  const from = idx.length;
+  for (const [at, dir] of edges) {
+    const base = pos.length / 3;
+    for (let i = 0; i < ys.length; i++) {
+      const phi = at(i);
+      skin(phi, ys[i]);
+      T.set(Math.cos(phi), 0, -Math.sin(phi)).multiplyScalar(dir);
+      vert(P, T, false);
+      P.addScaledVector(N, -SHELL); vert(P, T, false);
+    }
+    for (let i = 0; i < ys.length - 1; i++) {
+      const o = base + 2 * i, n = o + 2;   // outer and inner on this ring, then on the next
+      if (dir < 0) idx.push(o, n, n + 1, o, n + 1, o + 1); else idx.push(o, n + 1, n, o, o + 1, n + 1);
+    }
+  }
+  geo.addGroup(from, idx.length - from, 3);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(idx);
+  return geo;
+}
+
+// When each part happens, in seconds: the tear wells up, then runs; the crack runs down from the crown in
+// three bursts [when, how far, how quickly]; the halves strain apart, then fall open; the soul slips out
+// and rises for soulFor seconds; the halves fade as it goes.
+const BRK = { well: .3, run: .95, crack: [[1.55, .36, .08], [1.82, .7, .08], [2.06, 1, .1]], strain: 2.32, open: 2.66,
+  soul: 2.95, soulFor: 2.6, fade: 4.25, gone: 4.65, end: 5.6 };
+// The soul: a soft wisp with a round glowing head and a tail that flickers behind it like a candle flame
+const SOUL_GEO = new THREE.PlaneGeometry(.6, .9);
+const SOUL_SHADER = {
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+  fragmentShader: `uniform float uTime, uAlpha; varying vec2 vUv;
+    void main() {
+      vec2 q = (vUv - .5) * vec2(.6, .9);   // body units, from the middle of the plane
+      const float HY = .14, HR = .1, TAIL = .5;
+      float t = clamp((HY - q.y) / TAIL, 0., 1.);   // 0 at the head, 1 at the tip of the tail
+      float sway = .06 * t * t * sin(uTime * 4.6 - t * 5.);
+      float d = q.y > HY ? length(q - vec2(0., HY)) - HR
+        : q.y < HY - TAIL ? length(vec2(q.x - sway, q.y - HY + TAIL))
+        : abs(q.x - sway) - HR * (1. - pow(t, .7));
+      float body = smoothstep(.025, -.02, d) * (1. - .65 * t) * (.92 + .08 * sin(uTime * 13. + q.y * 50.));
+      float glow = exp(-max(d, 0.) / .05) * (1. - .5 * t);
+      float core = exp(-length((q - vec2(0., HY)) / vec2(.045, .055)));
+      vec3 c = mix(vec3(.6, .8, 1.), vec3(1.), clamp(core * 1.4 + .3 * body, 0., 1.));
+      gl_FragColor = vec4(c, clamp(.8 * body + .4 * glow + core, 0., 1.) * uAlpha);
+    }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+};
+const TEAR_AT = new THREE.Vector2(.183, .552);   // just under the painted eye's lower rim, in body units
+const TEAR_SIZE = new THREE.Vector3(.085, .11, .05);
+const _v = new THREE.Vector3(), _n = new THREE.Vector3(), _u = new THREE.Vector3(), _x = new THREE.Vector3(), _m = new THREE.Matrix4();
+class Break {
+  constructor(doll) {
+    this.doll = doll; this.t = 0; this.R = 0; this.jit = 0; this.spread = 0; this.fading = false; this.done = false;
+    const crack = crackLine();
+    // the crack as drawn on the face, from the crown down, with a few hairlines branching off it
+    this.path = crack.front.slice().reverse();
+    this.len = [0];
+    for (let i = 1; i < this.path.length; i++) this.len.push(this.len[i - 1] + this.path[i].distanceTo(this.path[i - 1]));
+    this.branches = [];
+    for (let i = 2; i < this.path.length - 4 && this.branches.length < 3; i++) if (Math.random() < .3) {
+      const a = this.path[i], side = Math.random() < .5 ? -1 : 1, l = rand(.04, .075);
+      const b = new THREE.Vector2(a.x + side * l * .5, a.y - l * rand(.2, .5));
+      this.branches.push({ at: this.len[i], pts: [a, b, new THREE.Vector2(b.x + side * l * .5, b.y - l * rand(.1, .6))] });
+    }
+    // the painted design, drawn again with the crack and the tear's wet streak on it
+    this.base = mkCanvas(); drawDesign(this.base.getContext('2d'), palColor(doll.color), doll.eyes);
+    this.canvas = mkCanvas(); this.ctx = this.canvas.getContext('2d'); this.ctx.drawImage(this.base, 0, 0);
+    this.tex = canvasTex(this.canvas);
+    this.mats = [frontFrom(this.tex, ...doll.eyes), backMat(doll.color).clone(),
+      new THREE.MeshStandardMaterial({ color: '#b09c7e', roughness: 1, vertexColors: true }),
+      new THREE.MeshStandardMaterial({ color: '#efe3cc', roughness: .85, vertexColors: true, side: THREE.DoubleSide })];
+    this.depth = new THREE.MeshBasicMaterial({ colorWrite: false });
+    // the doll is now its two halves, meeting along the crack until they part
+    doll.front.visible = doll.back.visible = false;
+    this.halves = [[1, .6, 72, 0], [-1, .66, 64, .05]].map(([s, rest, k, wait]) => {
+      const mesh = new THREE.Mesh(halfShell(s, crack), this.mats);
+      mesh.rotation.order = 'YZX';   // it rocks outwards, then turns a little towards us
+      mesh.position.y = ROLL_R;
+      doll.inner.add(mesh);
+      return { s, rest, k, wait, mesh, th: 0, om: 0 };
+    });
+    this.tear = new THREE.Mesh(TEAR_GEO, new THREE.MeshPhysicalMaterial({
+      color: '#d6eaff', roughness: .05, clearcoat: 1, clearcoatRoughness: .04, specularIntensity: 1, ior: 1.4, transparent: true, opacity: .9 }));
+    this.tear.visible = false;
+    doll.inner.add(this.tear);
+    this.drop = { x: TEAR_AT.x, y: TEAR_AT.y, v: null, land: null, trail: false };
+    this.soul = new THREE.Mesh(SOUL_GEO, new THREE.ShaderMaterial({ ...SOUL_SHADER, uniforms: { uTime: { value: 0 }, uAlpha: { value: 0 } } }));
+    this.soul.visible = false;
+    doll.inner.add(this.soul);
+    this.glow = 0;                   // how brightly the soul lights the hollow it is leaving
+    this.motes = []; this.moteT = 0;   // where it has left a faint mote behind it, on the desk
+  }
+  update(dt) {
+    const t0 = this.t, t = this.t += dt;
+    let redraw = this.stepTear(dt);
+    this.stepSoul(dt);
+    // each burst of the crack lands with a tick that shakes the doll
+    let R = 0, prev = 0;
+    for (const [at, r, dur] of BRK.crack) {
+      if (t < at) break;
+      if (t0 < at) this.jit = 1;
+      R = prev + (r - prev) * smooth(at, at + dur, t); prev = r;
+    }
+    this.jit *= Math.exp(-dt * 22);
+    if (R !== this.R) { this.R = R; redraw = true; }
+    if (redraw) this.draw();
+    // the halves strain against each other, then let go and rock open on their round bottoms,
+    // weighted as a daruma is, turning a little towards us as they come to rest
+    const strain = smooth(BRK.strain, BRK.open, t), yaw = .38 * smooth(BRK.open, BRK.open + .6, t);
+    for (const h of this.halves) {
+      if (t < BRK.open + h.wait) h.th = .045 * strain * (1 + .15 * Math.sin(t * 60));
+      else { h.om += (-h.k * Math.sin(h.th - h.rest) - 6.5 * h.om) * dt; h.th += h.om * dt; }
+      h.mesh.position.x = h.s * ROLL_R * h.th;
+      h.mesh.rotation.set(0, h.s * yaw, -h.s * h.th);
+    }
+    this.spread = smooth(BRK.open, BRK.open + .5, t);
+    // and at last they shrink a little as they fade, each as one solid piece: a pass that only marks
+    // its nearest surface goes first, so the hollow never shows through itself
+    if (t >= BRK.fade && !this.mats[0].transparent) {
+      for (const m of this.mats) { m.transparent = true; m.needsUpdate = true; }
+      for (const h of this.halves) h.mesh.add(new THREE.Mesh(h.mesh.geometry, this.depth));
+    }
+    const f = smooth(BRK.fade, BRK.gone, t);
+    for (const m of this.mats) m.opacity = 1 - f;
+    for (const h of this.halves) { h.mesh.scale.setScalar(1 - .15 * f); h.mesh.visible = t < BRK.gone; }
+    this.fading = t >= BRK.gone;   // the halves are gone: the row may close up under the rising soul
+    this.done = t >= BRK.end;
+  }
+  // the tear wells up under the eye, runs down the cheek to the foot of the face, where the body begins
+  // to curve away under it, then falls and splashes thin on the floor; says whether its wet streak has grown
+  stepTear(dt) {
+    const t = this.t, dr = this.drop, tear = this.tear, S = TEAR_SIZE;
+    if (t < BRK.well) return false;
+    tear.visible = true;
+    if (dr.land !== null) {
+      const k = smooth(0, .1, t - dr.land);
+      tear.scale.set(S.x * (1 + 1.1 * k), S.x * (1 + 1.1 * k), S.z * (1 - .75 * k));
+      tear.material.opacity = .9 * (1 - smooth(.2, .8, t - dr.land));
+      return false;
+    }
+    if (dr.v) {
+      dr.v.y -= 20 * dt;
+      tear.position.addScaledVector(dr.v, dt);
+      if (tear.position.y <= .004) { tear.position.y = .004; dr.land = t; tear.quaternion.setFromAxisAngle(_x.set(1, 0, 0), -Math.PI / 2); }
+      return false;
+    }
+    const s = Math.max(0, t - BRK.run), speed = s > 0 ? .12 + .4 * s : 0;
+    dr.x = TEAR_AT.x + .025 * s; dr.y = TEAR_AT.y - (.12 * s + .2 * s * s);
+    onBody(dr.x, dr.y, _v, _n);
+    _u.set(0, 1, 0).addScaledVector(_n, -_n.y).normalize();   // uphill along the surface
+    _x.crossVectors(_u, _n);
+    tear.quaternion.setFromRotationMatrix(_m.makeBasis(_x, _u, _n));
+    const grow = easeOutBack(smooth(BRK.well, BRK.run - .1, t)) * (1 + .04 * Math.sin(t * 9) * (1 - smooth(BRK.run - .3, BRK.run, t)));
+    tear.scale.set(S.x * grow, S.y * grow * (1 + 1.4 * speed), S.z * grow);
+    tear.position.copy(_v).addScaledVector(_n, S.z * .2);
+    if (_n.y < -.1) dr.v = _u.clone().multiplyScalar(-speed).addScaledVector(_n, .15);   // the body turns under: it lets go
+    if (s > 0) { dr.trail = true; return true; }
+    return false;
+  }
+  // the soul slips up out of the hollow, lingers a moment above the halves, then rises, swaying, and fades
+  stepSoul(dt) {
+    const s = this.t - BRK.soul, soul = this.soul, u = soul.material.uniforms;
+    soul.visible = s > 0 && s < BRK.soulFor;
+    if (!soul.visible) { this.glow = 0; return; }
+    const rise = 2.2 * easeInOut(clamp((s - 1.1) / 1.5, 0, 1));
+    soul.position.set(.1 * Math.sin(s * 2.4) * smooth(.3, 1, s), .42 + .78 * smooth(0, .8, s) + .015 * Math.sin(s * 5) + rise, .02);
+    soul.scale.setScalar((.25 + .75 * easeOutBack(smooth(0, .6, s))) * (1 - .35 * smooth(1.6, 2.6, s)));
+    u.uAlpha.value = smooth(0, .35, s) * (1 - smooth(1.9, BRK.soulFor, s));
+    u.uTime.value = this.t;
+    this.glow = u.uAlpha.value * (1 - smooth(.7, 1.7, s));
+    if (s > .3 && s < 2.2 && (this.moteT -= dt) <= 0) { this.moteT = rand(.06, .12); this.motes.push(soul.getWorldPosition(new THREE.Vector3())); }
+  }
+  draw() {
+    const ctx = this.ctx, dr = this.drop;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(this.base, 0, 0);
+    ctx.setTransform(TEX / SPAN, 0, 0, -TEX / SPAN, TEX / 2, TEX);   // body units, as the front is mapped
+    ctx.lineCap = ctx.lineJoin = 'round';
+    if (dr.trail) {   // where the tear ran the lacquer stays wet, a shade deeper
+      ctx.beginPath(); ctx.moveTo(TEAR_AT.x, TEAR_AT.y); ctx.lineTo(dr.x, dr.y);
+      ctx.lineWidth = .026; ctx.strokeStyle = 'rgba(80, 36, 28, .18)'; ctx.stroke();
+    }
+    if (this.R > 0) {
+      // the crack as far down as it has run, and the hairlines off it once it has passed them
+      const L = this.R * this.len.at(-1), path = this.path, line = [path[0]];
+      for (let i = 1; i < path.length && this.len[i - 1] < L; i++) {
+        const f = Math.min(1, (L - this.len[i - 1]) / (this.len[i] - this.len[i - 1]));
+        line.push(new THREE.Vector2().lerpVectors(path[i - 1], path[i], f));
+      }
+      const hairs = this.branches.filter(b => L > b.at).map(b => {
+        const f = clamp((L - b.at) / .08, 0, 1);
+        return [b.pts[0], b.pts[1], new THREE.Vector2().lerpVectors(b.pts[1], b.pts[2], f)];
+      });
+      // a dark break, its lower lip chipped back to pale lacquer
+      for (const [w, dy, style] of [[.016, -.011, 'rgba(250, 236, 214, .55)'], [.022, 0, 'rgba(18, 8, 4, .92)']]) {
+        ctx.strokeStyle = style;
+        ctx.beginPath(); line.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p.x, p.y + dy));
+        ctx.lineWidth = w; ctx.stroke();
+        ctx.beginPath(); for (const h of hairs) h.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p.x, p.y + dy * .6));
+        ctx.lineWidth = w * .55; ctx.stroke();
+      }
+    }
+    this.tex.needsUpdate = true;
+  }
+  dispose() {
+    for (const h of this.halves) h.mesh.geometry.dispose();
+    for (const m of this.mats) m.dispose();
+    this.depth.dispose(); this.tear.material.dispose(); this.soul.material.dispose(); this.tex.dispose();
+  }
+}
+
+/* =====================================================================
    Torii: vermilion pillars, black kasagi with upturned ends
    ===================================================================== */
 const TORII_H = .94, TORII_W = 1.26;
@@ -1242,6 +1555,9 @@ deskRim.position.set(500, 700, -900);
 deskScene.add(deskKey, deskRim, new THREE.HemisphereLight(0xffffff, 0x8d90a0, .55));
 const deskCam = new THREE.PerspectiveCamera(18, 1, 1, 10000);
 const fireworks = new Fireworks(deskScene);
+const soulLight = new THREE.PointLight(0xcfe4ff, 0, 70, 0);   // the glow of a doll's soul on the hollow it leaves
+const SOUL_MOTE = new THREE.Color('#d8ecff');
+deskScene.add(soulLight);
 let W = innerWidth, H = innerHeight, deskDirty = true;
 const falling = [];   // parachutes collapsing after a landing
 
@@ -1300,7 +1616,7 @@ const xMax = () => Math.max(rowNear(), rowFar());
 // The dolls stand in one row from the gate with no gaps. A doll that is being
 // carried or is coming down keeps a space open where it would land, so the
 // others shuffle aside for it, and close up again behind a doll that leaves.
-const IN_ROW = ['idle', 'drop', 'roll', 'paint', 'cheer', 'rest'];
+const IN_ROW = ['idle', 'drop', 'roll', 'paint', 'cheer', 'rest', 'break'];   // a breaking doll keeps its place until its pieces fade
 const AIRBORNE = ['drag', 'chute', 'fall'];
 const airX = d => d.chute ? d.chute.x : d.hang ? d.hang.x : d.x;
 function pack(persist = true) {
@@ -1316,9 +1632,13 @@ function pack(persist = true) {
     d.ins = clamp(d.ins, 0, n - 1);
   }
   air.sort((a, b) => a.ins - b.ins).forEach(d => row.splice(Math.min(d.ins, row.length), 0, d));
+  // a doll falling open in two takes more room; a row that runs out of space closes up evenly
+  const room = d => d.mode === 'break' ? GAP * 1.55 : GAP, c = [0];
+  for (let i = 1; i < row.length; i++) c.push(c[i - 1] + (room(row[i - 1]) + room(row[i])) / 2);
+  const k = row.length > 1 ? Math.min(1, (xMax() - xMin()) / c.at(-1)) : 1;
   row.forEach((d, i) => {
-    d.slot = x0 + i * step;
-    d.z = Math.abs(step) < GAP * .9 && !AIRBORNE.includes(d.mode) ? -(i % 2) * 38 : 0;   // a crowded row staggers in depth
+    d.slot = x0 + dir * c[i] * k;
+    d.z = k < .9 && !AIRBORNE.includes(d.mode) ? -(i % 2) * 38 : 0;   // a crowded row staggers in depth
     if (d.mode === 'roll') retarget(d, d.slot);
     else if (!AIRBORNE.includes(d.mode)) {
       d.tx = d.slot;
@@ -1361,6 +1681,7 @@ function addDeskDoll(p, drop) {
 function removeDeskDoll(id) {
   const d = desk.get(id); if (!d) return;
   if (d.chute) cutChute(d);
+  if (d.brk) d.brk.dispose();
   deskScene.remove(d.doll.group, d.shadow);
   d.shadow.material.dispose();
   d.hit.remove();
@@ -1625,6 +1946,23 @@ function stepDoll(d, dt) {
     if (d.k <= 0) removeDeskDoll(d.id);
     return true;
   }
+  if (d.brk) {   // a removed task: the doll stands still while it cries and cracks, then falls open in two
+    const b = d.brk;
+    b.update(dt);
+    d.th *= Math.exp(-dt * 8); d.om = 0;
+    d.x += (d.tx - d.x) * Math.min(1, dt * 8);
+    place(d);
+    d.doll.group.position.x += Math.sin(b.t * 95) * b.jit * 1.4;
+    d.shadow.scale.x *= 1 + .6 * b.spread;
+    d.shadow.material.opacity *= 1 - smooth(BRK.fade, BRK.gone, b.t);
+    for (const p of b.motes.splice(0)) fireworks.add({ k: 't', x: p.x + rand(-3, 3), y: p.y - rand(4, 10), z: p.z, vx: rand(-6, 6), vy: rand(-4, 8), vz: 0,
+      g: -8, drag: 1.2, age: 0, life: rand(.8, 1.3), size: rand(3, 4.5), c: SOUL_MOTE, tw: 1 });
+    soulLight.intensity = 1.6 * b.glow;
+    if (b.glow) b.soul.getWorldPosition(soulLight.position);
+    if (b.fading && d.mode === 'break') { d.mode = 'broken'; pack(); }   // the others close up again
+    if (b.done) removeDeskDoll(d.id);
+    return true;
+  }
   if (d.mode === 'idle' && !REDUCED) {
     d.nudge -= dt;
     if (d.nudge <= 0) { d.om += rand(-.6, .6); d.nudge = rand(14, 28); }
@@ -1773,11 +2111,14 @@ function startFly(d) {
   d.fly = { t: 0, x0: d.x, y0: d.y, x1, y1, cx: (d.x + x1) / 2, cy: Math.max(d.y, y1) + 150, r0: d.doll.inner.rotation.y };
   pack();   // the others close up behind it as it flies
 }
+// A removed task is a broken promise: its doll sheds a tear, cracks and falls apart
 function letGo(id) {
   const d = desk.get(id); if (!d || d.mode !== 'idle') return;
-  d.mode = 'gone'; d.hit.hidden = true;
+  d.hit.hidden = true;
   state.active = state.active.filter(x => x.id !== id);
-  pack();
+  if (REDUCED) { d.mode = 'gone'; pack(); return; }
+  d.mode = 'break'; d.brk = new Break(d.doll);
+  pack();   // the others step back to give it room
 }
 function arrive() {
   gate.dom += 3.4;   // the little doll under the gate rocks to greet the new arrival
