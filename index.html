@@ -269,7 +269,7 @@
   .in-app body { background: transparent; }
   .in-app .desktop { display: none; }
   .in-app .scrim, .in-app .hall { inset: var(--wa-top, 0) var(--wa-right, 0) var(--wa-bottom, 0) var(--wa-left, 0); }   /* clear of the menu bar and Dock */
-  .in-app .glow { mix-blend-mode: normal; opacity: .35; }
+  .in-app .glow { display: none; }   /* the app puts a frosted panel there instead */
 
   @media (max-width: 640px) {
     .hall { padding: 0; }
@@ -1228,7 +1228,11 @@ function placeGate() {
   gate.shadow.position.set(gate.x, BASE_Y + 1, -14);
   gate.shadow.scale.set(gate.s * 2.1, gate.s * .32, 1);
   const x = Math.round(gate.x);
-  if (x !== gate.px || BASE_Y !== gate.py) { gate.px = x; gate.py = BASE_Y; launcher.style.left = (x - 42) + 'px'; launcher.style.bottom = (BASE_Y - 6) + 'px'; placeGlow(); }
+  if (x !== gate.px || BASE_Y !== gate.py) {
+    gate.px = x; gate.py = BASE_Y; launcher.style.left = (x - 42) + 'px'; launcher.style.bottom = (BASE_Y - 6) + 'px'; placeGlow();
+    // in the desktop app a frosted panel behind the gate hides whatever is under it
+    if (window.darumaApp) window.darumaApp.plate({ x: x - 44, y: H - (BASE_Y - 4) - 60, w: 88, h: 60 });
+  }
 }
 // a soft lift of the wallpaper behind the gate, blended into it rather than painted over it
 function placeGlow() {

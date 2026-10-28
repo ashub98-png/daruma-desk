@@ -16,7 +16,7 @@ const SNAPSHOT = process.env.DARUMA_SNAPSHOT;   // a test run: render, save a ca
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 if (SNAPSHOT) app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'daruma-')));
 
-let win = null, tray = null, lastInset = '', shown = { dock: true, bar: true };
+let win = null, plate = null, tray = null, lastInset = '', shown = { dock: true, bar: true };
 
 // The room the Dock and the menu bar take at the screen's edges, or none for whichever is hidden right now:
 // the work area keeps room for them even in a full-screen space, so dockwatch reports what is on screen
@@ -77,6 +77,17 @@ function createWindow() {
   setInterval(watchInset, 1000);
   for (const ev of ['display-metrics-changed', 'display-added', 'display-removed']) screen.on(ev, refit);
   win.on('closed', () => { win = null; });
+  // A small frosted panel just under the window, behind the gate, so what is beneath it is blurred away.
+  // macOS draws the blur itself; a page cannot blur what lies outside its window.
+  plate = new BrowserWindow({
+    width: 96, height: 62, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false, roundedCorners: true,
+    resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false, focusable: false,
+    skipTaskbar: true, show: false, vibrancy: 'popover', visualEffectState: 'active',
+  });
+  plate.setIgnoreMouseEvents(true);
+  plate.setAlwaysOnTop(true, 'floating', -1);   // one step below the dolls' window
+  plate.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  plate.loadURL('data:text/html,<body style="margin:0;background:transparent"></body>');
   if (SNAPSHOT) snapshot();
 }
 
@@ -119,6 +130,12 @@ function makeTray() {
 }
 
 ipcMain.on('inset', e => { e.returnValue = inset(); lastInset = JSON.stringify(e.returnValue); });
+ipcMain.on('plate', (e, r) => {
+  if (!plate || plate.isDestroyed() || !win) return;
+  const o = win.getBounds();
+  plate.setBounds({ x: Math.round(o.x + r.x), y: Math.round(o.y + r.y), width: Math.round(r.w), height: Math.round(r.h) });
+  if (!plate.isVisible()) plate.showInactive();
+});
 ipcMain.on('click-through', (e, on) => { if (win) win.setIgnoreMouseEvents(!!on, { forward: true }); });
 
 if (!app.requestSingleInstanceLock()) app.quit();
