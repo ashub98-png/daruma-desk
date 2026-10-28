@@ -5,6 +5,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, screen, ipcMain, protocol }
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const { spawn } = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.170.0/';
@@ -15,13 +16,31 @@ const SNAPSHOT = process.env.DARUMA_SNAPSHOT;   // a test run: render, save a ca
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 if (SNAPSHOT) app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'daruma-')));
 
-let win = null, tray = null, lastInset = '';
+let win = null, tray = null, lastInset = '', shown = { dock: true, bar: true };
 
-// The room the Dock and the menu bar take at the screen's edges. It shrinks to nothing while the Dock hides
-// (a full-screen app, or auto-hide), and macOS gives no notice of that, so it is checked often.
+// The room the Dock and the menu bar take at the screen's edges, or none for whichever is hidden right now:
+// the work area keeps room for them even in a full-screen space, so dockwatch reports what is on screen
 function inset() {
   const d = screen.getPrimaryDisplay(), b = d.bounds, a = d.workArea;
-  return { top: a.y - b.y, bottom: b.y + b.height - (a.y + a.height), left: a.x - b.x, right: b.x + b.width - (a.x + a.width) };
+  const v = { top: a.y - b.y, bottom: b.y + b.height - (a.y + a.height), left: a.x - b.x, right: b.x + b.width - (a.x + a.width) };
+  if (!shown.dock) v.bottom = v.left = v.right = 0;
+  if (!shown.bar) v.top = 0;
+  return v;
+}
+function watchDock() {
+  const bin = app.isPackaged ? path.join(process.resourcesPath, 'dockwatch') : path.join(ROOT, 'build', 'dockwatch');
+  if (!fs.existsSync(bin)) return;   // without it, the dolls keep to the work area
+  const p = spawn(bin, [], { stdio: ['ignore', 'pipe', 'ignore'] });
+  let buf = '';
+  p.stdout.on('data', chunk => {
+    buf += chunk;
+    for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) {
+      const [dock, bar] = buf.slice(0, i).split(' ');
+      shown = { dock: dock === '1', bar: bar === '1' };
+      watchInset();
+    }
+  });
+  app.on('will-quit', () => p.kill());
 }
 function watchInset() {
   if (!win || win.isDestroyed()) return;
@@ -110,6 +129,7 @@ else {
     // no menu bar shows, but the Edit menu is what makes copy and paste work in the pledge field
     Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]));
     serve();
+    watchDock();
     createWindow();
     if (!SNAPSHOT) makeTray();
   });

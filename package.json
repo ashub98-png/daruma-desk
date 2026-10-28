@@ -8,8 +8,9 @@
   "private": true,
   "main": "app/main.js",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --mac dmg"
+    "start": "npm run helper && electron .",
+    "dist": "npm run helper && electron-builder --mac dmg",
+    "helper": "swiftc -O app/dockwatch.swift -o build/dockwatch"
   },
   "build": {
     "appId": "io.github.ashub98-png.daruma-desk",
@@ -38,7 +39,13 @@
     },
     "dmg": {
       "title": "Daruma Desk"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "build/dockwatch",
+        "to": "dockwatch"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^45.1.0",
