@@ -103,7 +103,7 @@ These rules came out of the back-and-forth above and should guide future changes
 - **Apple-like, Swiss-inspired, minimal, warm, with a subtle Japanese feel.** Not sticker or kawaii. Not bland either: a near-white version was rejected as "plain and bland".
 - **Spend craft on the objects and interactions**: the lacquer dolls, the torii, the parachute, the rolling, the fireworks. Keep the interface chrome typographic and quiet.
 - **Build only what was asked.** "Realistic" means the named object, not an immersive scene. The courtyard Hall was "too much"; the torii, sun and stepped-stand Hall was "cluttered"; the oak rack was "not good"; the branch was "ugly". What lasted is walnut ledges with falling petals.
-- **No containers or boxes** around things on the desktop. The frosted tile behind the gate was rejected; a feathered blur was accepted.
+- **No containers or boxes** around things on the desktop. The frosted tile behind the gate was rejected; a feathered blur was accepted. In the Hall, the open doll's label is type on the wall, not a white card.
 - **Wording:** "task" (not "pledge"), never "wish". No Japanese-language text. No colour meanings.
 - **Buttons:** black, 6 px radius.
 - **On the desktop, stay out of the way.** Rest on the bottom edge or on top of the Dock, never over the Dock or app content, and let clicks through everywhere else.
@@ -124,7 +124,7 @@ These rules came out of the back-and-forth above and should guide future changes
 ### The Hall of Dolls
 - Floating walnut ledges on a warm plaster wall, lit by soft daylight with long shadows, and sakura petals falling slowly and settling on the ledges.
 - Dolls are spread evenly and centred, oldest first, so there is never a lone doll on a shelf. The view fits anything from 1 to 24 or more dolls, on wide and narrow windows.
-- **Pick a doll:** it steps forward onto a walnut stand while the wall softens behind it into a real blur. In a wide window a label beside it shows "No. 03 of 12", the task, and "Added … · Done … · 5 days"; in a narrow window this caption sits at the bottom. Arrow keys or buttons step through the dolls, and <kbd>Esc</kbd> goes back.
+- **Pick a doll:** it steps forward onto a walnut stand while the wall softens and fades behind it. Its label is set straight on the wall like a museum placard, with no card: the task (sized by its length), a hairline, then Added, Done and Took. In a wide window doll and label stand side by side, centred together as one piece; in a narrow one the label hangs just under the stand. The arrows under the label or the arrow keys step through the dolls; **All dolls** (top left) or <kbd>Esc</kbd> goes back.
 - While a doll is open, the dolls behind it can't be hovered or picked.
 - A **New doll** button opens the task sheet over the Hall. Adding a task closes the Hall so you see the new doll come down.
 - An empty Hall offers "Preview with sample dolls". The samples are never saved.

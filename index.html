@@ -196,7 +196,7 @@
   }
   .hall.show { opacity: 1; visibility: visible; transition: opacity .3s ease, visibility 0s; }
   .hall:focus { outline: none; }
-  .round:focus-visible, .nav:focus-visible, .hall-actions .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px #fffbf5, 0 0 0 4px var(--shu); }
+  .round:focus-visible, .nav:focus-visible, .hall-actions .btn:focus-visible, .hall-back:focus-visible { outline: none; box-shadow: 0 0 0 2px #fffbf5, 0 0 0 4px var(--shu); }
   /* a plaster wall in soft daylight; the rack and its shadows are drawn over it */
   .hall-win {
     position: relative; width: min(1000px, 100%); height: min(720px, 100%); overflow: hidden; border-radius: 26px;
@@ -216,7 +216,7 @@
   #hallFocus { pointer-events: none; }
   /* picking a doll pulls focus: the rack softens behind it */
   #hallGL { transition: filter .5s var(--ease), opacity .5s var(--ease); }
-  .hall-win.focus #hallGL { filter: blur(7px) saturate(.9); opacity: .6; }
+  .hall-win.focus #hallGL { filter: blur(9px) saturate(.85); opacity: .42; }   /* veiled by the plaster, so the open doll stands alone */
   .hall-head { position: absolute; top: 0; left: 0; right: 0; padding: 30px 72px 0; text-align: center; pointer-events: none; }
   .hall-head h1 { margin: 0; padding-left: .32em; font: 600 12px/1 var(--font); letter-spacing: .32em; text-transform: uppercase; }
   .hall-head p { margin: 8px 0 0; font: 400 13px/1.3 var(--font); color: var(--ink-2); text-wrap: balance; }
@@ -230,39 +230,45 @@
   }
   .round:hover { background: rgba(60, 30, 20, .1); color: var(--ink); }
   .round svg { width: 14px; height: 14px; }
+  /* the open doll's label, set straight on the wall like a museum placard: under the doll in a narrow window,
+     and in a wide one beside it, the two centred together as one piece (the Hall places it, see placeSpot) */
   .hall-cap {
-    position: absolute; left: 50%; bottom: 20px; width: min(560px, calc(100% - 32px));
-    display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "prev body next"; align-items: center; gap: 10px; padding: 12px;
-    border-radius: 22px; background: rgba(255, 255, 255, .8); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6);
-    box-shadow: var(--edge), var(--shadow-1);
-    opacity: 0; visibility: hidden; transform: translate(-50%, 14px);
-    transition: opacity .2s ease, transform .35s var(--spring), visibility 0s linear .35s;
+    position: absolute; left: 50%; top: var(--cap-y); width: min(400px, calc(100% - 48px)); text-align: center;
+    opacity: 0; visibility: hidden; transform: translate(-50%, 10px);
+    transition: opacity .2s ease, transform .4s var(--ease), visibility 0s linear .4s;
   }
-  .hall-cap.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity .2s ease, transform .35s var(--spring), visibility 0s; }
-  .cap-body { grid-area: body; min-width: 0; text-align: center; }
-  #capPrev { grid-area: prev; } #capNext { grid-area: next; }
-  .index { font: 600 10.5px/1 var(--font); letter-spacing: .16em; text-transform: uppercase; color: var(--shu); font-variant-numeric: tabular-nums; }
-  .cap-task {
-    margin: 7px 0 5px; font: 600 19px/1.25 var(--display); letter-spacing: -.02em; text-wrap: balance; overflow-wrap: anywhere;
-    max-height: 3.75em; overflow-y: auto; scrollbar-width: thin;   /* at most three lines under the doll; a longer task scrolls */
-  }
-  /* in a wide window the caption is a label beside the doll, with room for a long task */
-  .hall-win.side .hall-cap {
-    left: auto; right: max(28px, 6%); top: 52%; bottom: auto; width: min(340px, 36%);
-    grid-template-columns: auto 1fr auto; grid-template-areas: "body body body" "prev . next";
-    row-gap: 16px; padding: 22px 18px 16px 22px; transform: translate(14px, -50%);
-  }
+  .hall-cap.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity .3s ease .1s, transform .5s var(--ease) .1s, visibility 0s; }
+  .hall-win.side .hall-cap { left: var(--cap-x); width: var(--cap-w); text-align: left; transform: translate(12px, -50%); }
   .hall-win.side .hall-cap.show { transform: translate(0, -50%); }
-  .hall-win.side .cap-body { text-align: left; }
-  .hall-win.side .cap-task { margin: 10px 0 8px; font-size: 22px; line-height: 1.22; text-wrap: pretty; max-height: min(11em, 42vh); }
-  .cap-meta { margin: 0; font: 400 12.5px/1.4 var(--font); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  /* the task sets the size: a few words read as a title, a long task as a paragraph */
+  .cap-task {
+    margin: 0; font: 600 22px/1.22 var(--display); letter-spacing: -.02em; color: var(--ink);
+    text-wrap: balance; overflow-wrap: anywhere; max-height: 5.5em; overflow-y: auto; scrollbar-width: thin;
+  }
+  .cap-task[data-len="s"] { font-size: 28px; line-height: 1.14; letter-spacing: -.025em; }
+  .cap-task[data-len="l"] { font-size: 18px; line-height: 1.36; letter-spacing: -.012em; text-wrap: pretty; }
+  .cap-facts { display: flex; gap: 24px; margin: 18px 0 0; padding-top: 14px; border-top: 1px solid rgba(60, 30, 20, .14); }
+  .hall-win:not(.side) .cap-facts { justify-content: center; }
+  .cap-facts dt { font: 600 9.5px/1 var(--font); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+  .cap-facts dd { margin: 6px 0 0; font: 500 13px/1.2 var(--font); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .hall-cap.swap .cap-task, .hall-cap.swap dd { animation: swap .4s var(--ease); }
+  @keyframes swap { from { opacity: 0; transform: translateY(4px); } }
+  .cap-nav { display: flex; gap: 8px; margin-top: 22px; }
+  .hall-win:not(.side) .cap-nav { justify-content: center; margin-top: 18px; }
   .nav {
-    width: 38px; height: 38px; padding: 0; border: 0; border-radius: 19px; cursor: pointer; display: grid; place-items: center;
+    width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center;
     background: rgba(60, 30, 20, .06); color: var(--ink); transition: background-color .15s ease, opacity .15s ease;
   }
   .nav:hover:not(:disabled) { background: rgba(60, 30, 20, .11); }
   .nav:disabled { opacity: .3; cursor: default; }
-  .nav svg { width: 18px; height: 18px; }
+  .nav svg { width: 16px; height: 16px; }
+  /* back to every doll, while one is open */
+  .hall-back {
+    position: absolute; top: 18px; left: 18px; display: inline-flex; align-items: center; gap: 2px; padding: 0 12px 0 7px;
+    opacity: 0; visibility: hidden; transform: translateX(-4px);
+    transition: opacity .2s ease, transform .3s var(--ease), visibility 0s linear .3s, background-color .15s ease;
+  }
+  .hall-win.focus .hall-back { opacity: 1; visibility: visible; transform: none; transition: opacity .25s ease, transform .3s var(--ease), visibility 0s, background-color .15s ease; }
   .hall-empty {
     position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(340px, calc(100% - 32px));
     padding: 16px 18px; border-radius: 20px; text-align: center;
@@ -294,7 +300,11 @@
     .hall-head { padding: 24px 92px 0; }
     .hall-actions .btn.primary { width: 32px; padding: 0; justify-content: center; }
     .hall-actions .btn.primary span { display: none; }
-    .cap-task { font-size: 17px; }
+    .hall-back { width: 32px; padding: 0; justify-content: center; }
+    .hall-back span { display: none; }
+    .cap-task[data-len="s"] { font-size: 24px; }
+    .cap-task[data-len="m"] { font-size: 20px; }
+    .cap-task[data-len="l"] { font-size: 17px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -375,18 +385,27 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="hall-cap" id="hallCap" aria-live="polite">
-      <button type="button" class="nav" id="capPrev" aria-label="Previous doll">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>
-      </button>
-      <div class="cap-body">
-        <span class="index" id="capIndex"></span>
+    <button type="button" class="btn ghost hall-back" id="hallBack" aria-label="All dolls">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>
+      <span>All dolls</span>
+    </button>
+    <div class="hall-cap" id="hallCap">
+      <div aria-live="polite">
         <p class="cap-task" id="capTask"></p>
-        <p class="cap-meta" id="capMeta"></p>
+        <dl class="cap-facts">
+          <div><dt>Added</dt><dd id="capAdded"></dd></div>
+          <div><dt>Done</dt><dd id="capDone"></dd></div>
+          <div><dt>Took</dt><dd id="capTook"></dd></div>
+        </dl>
       </div>
-      <button type="button" class="nav" id="capNext" aria-label="Next doll">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg>
-      </button>
+      <div class="cap-nav">
+        <button type="button" class="nav" id="capPrev" aria-label="Previous doll">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>
+        </button>
+        <button type="button" class="nav" id="capNext" aria-label="Next doll">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg>
+        </button>
+      </div>
     </div>
     <div class="hall-empty" id="hallEmpty" hidden>
       <p>Mark a task as done and its doll will stand here.</p>
@@ -1063,7 +1082,6 @@ try {
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
 const uid = () => Math.random().toString(36).slice(2, 9);
 const DAY = 864e5;
-const pad = n => String(n).padStart(2, '0');
 const fmtDate = ts => {
   const d = new Date(ts), opts = { day: 'numeric', month: 'short' };
   if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
@@ -2361,20 +2379,32 @@ const Hall = (() => {
     const o = ray.ray.origin, d = ray.ray.direction;
     return o.clone().addScaledVector(d, (zp - o.z) / d.z);
   }
-  // the stand for a chosen doll: low in the middle of the view, well in front of the ledges
+  // The stand for a chosen doll, well in front of the ledges. Doll and label are centred together as one piece:
+  // side by side in a wide window, the label level with the middle of doll and stand; in a narrow one stacked,
+  // the label hanging just under the stand.
+  const HEAD_ROOM = 92, CAP_H = 210, CAP_GAP = 36;   // pixels under the title; the most a label under the doll takes, and its gap
   function placeSpot(dist) {
-    // in a wide window the doll steps out to the left of the middle, its label beside it; else above the caption
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    layout.side = w >= 760 && w / h >= 1.15;
+    const w = canvas.clientWidth, h = canvas.clientHeight, d = dist * .55;
+    const vh = 2 * d * Math.tan(rad(cam.fov / 2)), ppu = h / vh;   // pixels per world unit at the stand
+    let s = Math.min(.36 * vh, .55 * vh * cam.aspect) / (BODY_H + .08);   // never wider than about half the view
+    const capW = clamp(w * .3, 260, 320), gap = clamp(w * .06, 40, 72);
+    layout.side = w / h >= 1.15 && w - (1.22 * s * ppu + gap + capW) >= 160;
     win.classList.toggle('side', layout.side);
-    if (layout.side) ndc.set(-.3, -.46); else ndc.set(0, -.52);
+    const top = HEAD_ROOM, room = h - top - (layout.side ? 36 : 24 + CAP_GAP + CAP_H);   // for doll and stand
+    s = Math.min(s, (room - 16) / ((BODY_H + .08) * ppu));   // a short window shrinks the doll to fit
+    layout.spotS = s;
+    const objW = 1.22 * s * ppu, objH = (BODY_H + .08) * s * ppu;   // the stand's width; doll and stand together
+    const left = (w - (objW + gap + capW)) / 2, cx = layout.side ? left + objW / 2 : w / 2, cy = top + room / 2;
+    const sy = cy + (BODY_H - .08) / 2 * s * ppu;   // the top of the stand, where the doll's foot rests
+    ndc.set(cx / w * 2 - 1, 1 - sy / h * 2);
     ray.setFromCamera(ndc, cam);
-    const fwd = cam.getWorldDirection(new THREE.Vector3()), d = dist * .55;
+    const fwd = cam.getWorldDirection(new THREE.Vector3());
     const P = ray.ray.at(d / ray.ray.direction.dot(fwd), new THREE.Vector3());
     layout.spot.copy(P);
-    const vh = 2 * d * Math.tan(rad(cam.fov / 2));
-    layout.spotS = Math.min(.32 * vh, .55 * vh * cam.aspect) / (BODY_H + .08);   // never wider than about half the view
-    contact.position.set(P.x, P.y + .0015, P.z); contact.scale.setScalar(.95 * layout.spotS);
+    contact.position.set(P.x, P.y + .0015, P.z); contact.scale.setScalar(.95 * s);
+    win.style.setProperty('--cap-x', left + objW + gap + 'px');
+    win.style.setProperty('--cap-y', (layout.side ? cy : cy + objH / 2 + CAP_GAP) + 'px');
+    win.style.setProperty('--cap-w', capW + 'px');
   }
   function placeLight() {
     const c = new THREE.Vector3(0, layout.H * .5, WALL * .5), ext = Math.max(layout.view.vw, layout.view.vh) * .75;
@@ -2399,11 +2429,17 @@ const Hall = (() => {
     moveTo(it, layout.spot, layout.spotS, .66, .22);
     win.classList.add('focus');
     tipEl.classList.remove('show');
-    $('#capIndex').textContent = `No. ${pad(it.idx + 1)} of ${pad(L().length)}`;
-    $('#capTask').textContent = it.p.text;
-    $('#capMeta').textContent = `Added ${fmtDate(it.p.created)} · Done ${fmtDate(it.p.done)} · ${took(it.p.created, it.p.done)}`;
+    const task = $('#capTask'), n = it.p.text.length;
+    task.textContent = it.p.text;
+    task.dataset.len = n <= 28 ? 's' : n <= 64 ? 'm' : 'l';
+    task.scrollTop = 0;
+    $('#capAdded').textContent = fmtDate(it.p.created);
+    $('#capDone').textContent = fmtDate(it.p.done);
+    $('#capTook').textContent = took(it.p.created, it.p.done);
     $('#capPrev').disabled = it.idx === 0;
     $('#capNext').disabled = it.idx === L().length - 1;
+    // stepping from one doll to the next, the words change over softly
+    if (capEl.classList.contains('show') && !REDUCED) { capEl.classList.remove('swap'); void capEl.offsetWidth; capEl.classList.add('swap'); }
     capEl.classList.add('show');
   }
   function deselect() {
@@ -2499,6 +2535,7 @@ const Hall = (() => {
   $('#hallClose').addEventListener('click', () => close());
   $('#hallNew').addEventListener('click', () => openCompose());
   root.addEventListener('mousedown', e => { if (e.target === root) close(); });
+  $('#hallBack').addEventListener('click', () => { deselect(); root.focus({ preventScroll: true }); });
   $('#capPrev').addEventListener('click', () => step(-1));
   $('#capNext').addEventListener('click', () => step(1));
   $('#sampleBtn').addEventListener('click', () => {
