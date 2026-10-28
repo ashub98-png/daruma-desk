@@ -17,7 +17,29 @@ win.hasShadow = false
 win.ignoresMouseEvents = true
 win.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue - 1)   // just under the dolls' window
 win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-let blur = NSVisualEffectView()
+// System blur with its tint taken out, so the patch keeps the colours of whatever is behind it:
+// dark over a dark background, light over a light one. (The tint is a few named layers over the
+// blur; macOS rebuilds them now and then, as on a switch between light and dark, so they are taken out again.)
+final class ClearBlur: NSVisualEffectView {
+  override func layout() { super.layout(); clear() }
+  override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); clear() }
+  func clear() {
+    CATransaction.begin(); CATransaction.setDisableActions(true)
+    func walk(_ l: CALayer) {
+      if l.name == "backdrop", let filters = l.filters as? [NSObject] {
+        let keep = filters.filter { ["sdrNormalize", "gaussianBlur"].contains($0.value(forKey: "name") as? String ?? "") }
+        if keep.count != filters.count {
+          for f in keep where f.value(forKey: "name") as? String == "gaussianBlur" { f.setValue(26, forKey: "inputRadius") }
+          l.filters = keep
+        }
+      } else if ["fill", "tone", "Chameleon"].contains(l.name ?? "") { l.isHidden = true }
+      l.sublayers?.forEach(walk)
+    }
+    if let l = layer { walk(l) }
+    CATransaction.commit()
+  }
+}
+let blur = ClearBlur()
 blur.material = .popover
 blur.blendingMode = .behindWindow
 blur.state = .active
@@ -65,6 +87,7 @@ func poll() {
   }
   let state = "\(dock ? 1 : 0) \(bar ? 1 : 0)"
   if state != last { print(state); last = state }
+  blur.clear()
 }
 poll()
 Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in poll() }
