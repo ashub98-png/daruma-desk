@@ -1,5 +1,5 @@
-// Daruma Desk for macOS. The page runs in one transparent window that covers the whole screen, so the dolls
-// rest on its bottom edge, and floats over other windows, full-screen ones too. Clicks pass through to whatever is underneath, except
+// Daruma Desk for macOS. The page runs in one transparent window that covers the whole screen and floats over
+// other windows, full-screen ones too. The dolls stand on the Dock while it shows, else on the bottom edge. Clicks pass through to whatever is underneath, except
 // over the dolls, the gate and whatever is open; the page tells us which (see preload.js).
 const { app, BrowserWindow, Tray, Menu, nativeImage, screen, ipcMain, protocol } = require('electron');
 const path = require('node:path');
@@ -15,7 +15,19 @@ const SNAPSHOT = process.env.DARUMA_SNAPSHOT;   // a test run: render, save a ca
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 if (SNAPSHOT) app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'daruma-')));
 
-let win = null, tray = null;
+let win = null, tray = null, lastInset = '';
+
+// The room the Dock and the menu bar take at the screen's edges. It shrinks to nothing while the Dock hides
+// (a full-screen app, or auto-hide), and macOS gives no notice of that, so it is checked often.
+function inset() {
+  const d = screen.getPrimaryDisplay(), b = d.bounds, a = d.workArea;
+  return { top: a.y - b.y, bottom: b.y + b.height - (a.y + a.height), left: a.x - b.x, right: b.x + b.width - (a.x + a.width) };
+}
+function watchInset() {
+  if (!win || win.isDestroyed()) return;
+  const v = inset(), k = JSON.stringify(v);
+  if (k !== lastInset) { lastInset = k; win.webContents.send('inset', v); }
+}
 
 function serve() {
   protocol.handle('app', req => {
@@ -37,12 +49,13 @@ function createWindow() {
     skipTaskbar: true, alwaysOnTop: true, acceptFirstMouse: true, show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  win.setAlwaysOnTop(true, 'status');   // above the Dock, which would otherwise cover the dolls on the bottom edge
+  win.setAlwaysOnTop(true, 'floating');   // below the Dock and the menu bar, which the dolls keep clear of
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   win.setIgnoreMouseEvents(true, { forward: true });
   win.loadURL('app://daruma/index.html');
   win.once('ready-to-show', () => win.showInactive());
-  const refit = () => win && !win.isDestroyed() && win.setBounds(area());
+  const refit = () => { if (win && !win.isDestroyed()) { win.setBounds(area()); watchInset(); } };
+  setInterval(watchInset, 1000);
   for (const ev of ['display-metrics-changed', 'display-added', 'display-removed']) screen.on(ev, refit);
   win.on('closed', () => { win = null; });
   if (SNAPSHOT) snapshot();
@@ -86,6 +99,7 @@ function makeTray() {
   ]));
 }
 
+ipcMain.on('inset', e => { e.returnValue = inset(); lastInset = JSON.stringify(e.returnValue); });
 ipcMain.on('click-through', (e, on) => { if (win) win.setIgnoreMouseEvents(!!on, { forward: true }); });
 
 if (!app.requestSingleInstanceLock()) app.quit();

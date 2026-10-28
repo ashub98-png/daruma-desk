@@ -268,7 +268,7 @@
   /* ---------- In the desktop app the real desktop shows through ---------- */
   .in-app body { background: transparent; }
   .in-app .desktop { display: none; }
-  .in-app .scrim, .in-app .hall { inset: 0; }
+  .in-app .scrim, .in-app .hall { inset: var(--wa-top, 0) var(--wa-right, 0) var(--wa-bottom, 0) var(--wa-left, 0); }   /* clear of the menu bar and Dock */
   .in-app .glow { mix-blend-mode: normal; opacity: .35; }
 
   @media (max-width: 640px) {
@@ -1190,7 +1190,9 @@ class Fireworks {
    ===================================================================== */
 const DOLL_H = 44;
 const S = DOLL_H / BODY_H;
-const BASE_Y = 6;
+// the floor; in the desktop app it is the top of the Dock while the Dock shows, else the screen's bottom edge
+let INSET = (window.darumaApp && window.darumaApp.inset) || { top: 0, bottom: 0, left: 0, right: 0 };
+let BASE_Y = 6 + INSET.bottom;
 const GAP = 46;                          // minimum distance between resting dolls
 const HEAD = (BODY_H - ROLL_R) * .92;    // rocking centre to the top of the head, body units
 const deskR = setupRenderer($('#deskGL'), { alpha: true });
@@ -1212,7 +1214,7 @@ const falling = [];   // parachutes collapsing after a landing
 // It can be dragged to either corner; the row then runs from that side.
 const GATE_YAW = 0, GATE_IN = 48;
 const gate = { group: makeShrine(), x: GATE_IN, vx: 0, s: 40, k: 1, kT: 1, yaw: GATE_YAW, yawV: 0, dth: 0, dom: 0, side: state.side === 'right' ? 'right' : 'left', drag: null };
-gate.home = () => gate.side === 'left' ? GATE_IN : W - GATE_IN;
+gate.home = () => gate.side === 'left' ? GATE_IN + INSET.left : W - GATE_IN - INSET.right;
 gate.dir = () => gate.side === 'left' ? 1 : -1;
 gate.doll = gate.group.userData.doll;
 gate.shadow = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ map: BLOB, transparent: true, depthWrite: false, toneMapped: false, opacity: .75 }));
@@ -1226,7 +1228,7 @@ function placeGate() {
   gate.shadow.position.set(gate.x, BASE_Y + 1, -14);
   gate.shadow.scale.set(gate.s * 2.1, gate.s * .32, 1);
   const x = Math.round(gate.x);
-  if (x !== gate.px) { gate.px = x; launcher.style.left = (x - 42) + 'px'; placeGlow(); }
+  if (x !== gate.px || BASE_Y !== gate.py) { gate.px = x; gate.py = BASE_Y; launcher.style.left = (x - 42) + 'px'; launcher.style.bottom = (BASE_Y - 6) + 'px'; placeGlow(); }
 }
 // a soft lift of the wallpaper behind the gate, blended into it rather than painted over it
 function placeGlow() {
@@ -1252,7 +1254,7 @@ const hits = $('#hits');
 const launchBtn = $('#launch');
 // the row runs from beside the gate's corner towards the far edge
 const rowNear = () => gate.home() + gate.dir() * (gate.s * .85 + 10 + S * .5);
-const rowFar = () => gate.side === 'left' ? Math.max(rowNear(), W - 16 - S * .5) : Math.min(rowNear(), 16 + S * .5);
+const rowFar = () => gate.side === 'left' ? Math.max(rowNear(), W - INSET.right - 16 - S * .5) : Math.min(rowNear(), INSET.left + 16 + S * .5);
 const xMin = () => Math.min(rowNear(), rowFar());
 const xMax = () => Math.max(rowNear(), rowFar());
 
@@ -2563,7 +2565,19 @@ if (shell) {
   };
   addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; check(); }, true);
   setInterval(check, 250);
+  const insetVars = v => { for (const k of ['top', 'right', 'bottom', 'left']) document.documentElement.style.setProperty('--wa-' + k, v[k] + 'px'); };
+  insetVars(INSET);
   shell.onCommand(name => { if (name === 'new') openCompose(); else if (name === 'hall') Hall.open(); });
+  // the Dock showed or hid: resting dolls drop down onto the bottom edge, or step up onto the Dock
+  shell.onInset(v => {
+    const base = 6 + v.bottom;
+    INSET = v; insetVars(v);
+    if (base < BASE_Y) for (const d of desk.values()) { if (d.mode === 'idle') { d.mode = 'drop'; d.vy = 0; } }
+    BASE_Y = base;
+    for (const d of desk.values()) if (d.mode !== 'drop' && !AIRBORNE.includes(d.mode) && d.mode !== 'fly') d.y = Math.max(d.y, BASE_Y);
+    pack(false);
+    deskDirty = true;
+  });
 }
 
 window.__daruma = {
