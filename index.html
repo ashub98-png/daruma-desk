@@ -142,8 +142,8 @@
   .card-actions { display: flex; gap: 6px; }
   .card-actions .primary { flex: 1; }
 
-  /* ---------- New pledge sheet ---------- */
-  .scrim {   /* above the hall too, so a pledge can be made from inside it */
+  /* ---------- New task sheet ---------- */
+  .scrim {   /* above the hall too, so a task can be added from inside it */
     position: fixed; inset: 26px 0 0; z-index: 300; display: grid; place-items: center; padding: 24px;
     background: rgba(30, 18, 14, .22); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility 0s linear .2s;
@@ -297,14 +297,14 @@
 
 <div class="glow" id="glow" aria-hidden="true"></div>
 <canvas id="deskGL" aria-hidden="true"></canvas>
-<div id="hits" role="group" aria-label="Pledges on your desk"></div>
+<div id="hits" role="group" aria-label="Tasks on your desk"></div>
 
 <div class="card" id="card" role="dialog" aria-labelledby="cardTask">
-  <div class="card-top"><span class="eyebrow">Pledge</span><span class="age" id="cardAge"></span></div>
+  <div class="card-top"><span class="eyebrow">Task</span><span class="age" id="cardAge"></span></div>
   <p class="card-task" id="cardTask"></p>
   <div class="card-actions">
     <button type="button" class="btn primary" id="cardDone">Mark as done</button>
-    <button type="button" class="btn icon" id="cardRemove" aria-label="Remove pledge" title="Remove">
+    <button type="button" class="btn icon" id="cardRemove" aria-label="Remove task" title="Remove">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M10 4.5h4M7 7l.9 11.2a1.5 1.5 0 0 0 1.5 1.3h5.2a1.5 1.5 0 0 0 1.5-1.3L17 7"/></svg>
       <span class="lbl">Remove</span>
     </button>
@@ -315,7 +315,7 @@
   <div class="menu" id="menu" role="menu" aria-label="Daruma">
     <button type="button" class="mi" role="menuitem" id="optNew">
       <img class="ill" id="illNew" alt="">
-      <span class="txt"><span class="l">New doll</span><span class="s">Make a pledge</span></span>
+      <span class="txt"><span class="l">New doll</span><span class="s">Add a task</span></span>
       <kbd>N</kbd>
     </button>
     <button type="button" class="mi" role="menuitem" id="optHall">
@@ -331,12 +331,12 @@
   <form class="sheet" id="composeForm" role="dialog" aria-modal="true" aria-labelledby="composeTitle" novalidate>
     <canvas id="previewGL" aria-hidden="true"></canvas>
     <div class="swatches" id="swatches" role="radiogroup" aria-label="Doll colour"></div>
-    <h2 class="eyebrow" id="composeTitle">New pledge</h2>
+    <h2 class="eyebrow" id="composeTitle">New task</h2>
     <textarea id="taskInput" rows="1" maxlength="120" placeholder="What will you get done?" aria-labelledby="composeTitle"></textarea>
-    <p class="sheet-hint">One eye is painted when you pledge. The other, when it’s done.</p>
+    <p class="sheet-hint">One eye is painted now. The other, when it’s done.</p>
     <div class="sheet-actions">
       <button type="button" class="btn ghost" id="composeCancel">Cancel</button>
-      <button type="submit" class="btn primary" id="composeSave">Pledge</button>
+      <button type="submit" class="btn primary" id="composeSave">Add task</button>
     </div>
   </form>
 </div>
@@ -347,7 +347,7 @@
     <canvas id="hallFocus" aria-hidden="true"></canvas>
     <header class="hall-head">
       <h1 id="hallTitle">Hall of Dolls</h1>
-      <p id="hallSub">0 pledges kept</p>
+      <p id="hallSub">No tasks done yet</p>
     </header>
     <div class="hall-actions">
       <button type="button" class="btn primary" id="hallNew" aria-label="New doll" title="New doll (N)">
@@ -372,7 +372,7 @@
       </button>
     </div>
     <div class="hall-empty" id="hallEmpty" hidden>
-      <p>Mark a pledge as done and its doll will stand here.</p>
+      <p>Mark a task as done and its doll will stand here.</p>
       <button type="button" class="link" id="sampleBtn">Preview with sample dolls</button>
     </div>
     <div class="hall-tip" id="hallTip"></div>
@@ -1308,7 +1308,7 @@ function addDeskDoll(p, drop) {
   deskScene.add(shadow);
   const hit = document.createElement('button');
   hit.type = 'button'; hit.className = 'hit';
-  hit.setAttribute('aria-label', `Pledge: ${p.text}`);
+  hit.setAttribute('aria-label', `Task: ${p.text}`);
   hits.appendChild(hit);
   // a saved x keeps the doll's place in the row; a new doll joins the end
   const d = {
@@ -1694,14 +1694,14 @@ $('#cardDone').addEventListener('click', () => {
   if (id) complete(id);
   if (kb) launchBtn.focus({ preventScroll: true });
 });
-// removing a pledge takes a second, confirming click
+// removing a task takes a second, confirming click
 const removeBtn = $('#cardRemove');
 let disarmT = 0;
-function disarm() { clearTimeout(disarmT); removeBtn.classList.remove('armed'); removeBtn.setAttribute('aria-label', 'Remove pledge'); }
+function disarm() { clearTimeout(disarmT); removeBtn.classList.remove('armed'); removeBtn.setAttribute('aria-label', 'Remove task'); }
 removeBtn.addEventListener('click', () => {
   const id = cardId; if (!id) return;
   if (!removeBtn.classList.contains('armed')) {
-    removeBtn.classList.add('armed'); removeBtn.setAttribute('aria-label', 'Confirm: remove this pledge');
+    removeBtn.classList.add('armed'); removeBtn.setAttribute('aria-label', 'Confirm: remove this task');
     clearTimeout(disarmT); disarmT = setTimeout(disarm, 2600);
     return;
   }
@@ -1824,7 +1824,7 @@ function fillIllustrations() {
 }
 
 /* =====================================================================
-   New pledge sheet, with the doll on a small wooden stand
+   New task sheet, with the doll on a small wooden stand
    ===================================================================== */
 const prevR = setupRenderer($('#previewGL'), { alpha: true });
 prevR.setSize(180, 170, false);
@@ -1864,7 +1864,7 @@ sw.addEventListener('keydown', e => {
   sw.querySelector(`[data-key="${draftColor}"]`).focus();
 });
 function grow() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 110) + 'px'; }
-// Opens over the desk, or over the hall; a pledge made from the hall closes it,
+// Opens over the desk, or over the hall; a task added from the hall closes it,
 // so the new doll can be seen coming down onto the desk
 function openCompose() {
   if (composeOpen) return;
@@ -2379,7 +2379,7 @@ const Hall = (() => {
     tipEl.classList.remove('show');
     $('#capIndex').textContent = `No. ${pad(it.idx + 1)} of ${pad(L().length)}`;
     $('#capTask').textContent = it.p.text;
-    $('#capMeta').textContent = `Pledged ${fmtDate(it.p.created)} · Kept ${fmtDate(it.p.done)} · ${took(it.p.created, it.p.done)}`;
+    $('#capMeta').textContent = `Added ${fmtDate(it.p.created)} · Done ${fmtDate(it.p.done)} · ${took(it.p.created, it.p.done)}`;
     $('#capPrev').disabled = it.idx === 0;
     $('#capNext').disabled = it.idx === L().length - 1;
     capEl.classList.add('show');
@@ -2401,7 +2401,7 @@ const Hall = (() => {
 
   function refresh() {
     const n = L().length, demo = !state.hall.length && n > 0;
-    $('#hallSub').textContent = demo ? `Preview · ${n} sample dolls, not saved` : n ? `${n} pledge${n === 1 ? '' : 's'} kept` : 'No pledges kept yet';
+    $('#hallSub').textContent = demo ? `Preview · ${n} sample dolls, not saved` : n ? `${n} task${n === 1 ? '' : 's'} done` : 'No tasks done yet';
     updateCounts();
     capEl.classList.remove('show');
     emptyEl.hidden = n > 0;

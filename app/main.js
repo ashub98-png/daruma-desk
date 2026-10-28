@@ -12,7 +12,7 @@ const CDN = 'https://cdn.jsdelivr.net/npm/three@0.170.0/';
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.json': 'application/json' };
 const SNAPSHOT = process.env.DARUMA_SNAPSHOT;   // a test run: render, save a capture there and quit
 
-// Its own scheme gives the page a stable origin, so pledges saved in local storage stay put
+// Its own scheme gives the page a stable origin, so tasks saved in local storage stay put
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 if (SNAPSHOT) app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'daruma-')));
 
@@ -132,7 +132,7 @@ else {
   app.on('second-instance', () => command('new'));
   app.whenReady().then(() => {
     app.dock?.hide();   // it lives in the menu bar, not the Dock
-    // no menu bar shows, but the Edit menu is what makes copy and paste work in the pledge field
+    // no menu bar shows, but the Edit menu is what makes copy and paste work in the task field
     Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]));
     serve();
     startHelper();
