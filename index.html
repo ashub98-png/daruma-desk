@@ -138,7 +138,10 @@
   .card-top .eyebrow { display: inline-flex; align-items: center; gap: 7px; }
   .card-top .eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--shu); }
   .age { font: 500 11px var(--font); color: var(--ink-2); font-variant-numeric: tabular-nums; }
-  .card-task { margin: 10px 0 14px; font: 600 15px/1.35 var(--font); letter-spacing: -.01em; overflow-wrap: anywhere; }
+  .card-task {
+    margin: 10px 0 14px; font: 600 15px/1.35 var(--font); letter-spacing: -.01em; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden;   /* a long task is cut short here */
+  }
   .card-actions { display: flex; gap: 6px; }
   .card-actions .primary { flex: 1; }
 
@@ -229,16 +232,29 @@
   .round svg { width: 14px; height: 14px; }
   .hall-cap {
     position: absolute; left: 50%; bottom: 20px; width: min(560px, calc(100% - 32px));
-    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 12px;
+    display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "prev body next"; align-items: center; gap: 10px; padding: 12px;
     border-radius: 22px; background: rgba(255, 255, 255, .8); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6);
     box-shadow: var(--edge), var(--shadow-1);
     opacity: 0; visibility: hidden; transform: translate(-50%, 14px);
     transition: opacity .2s ease, transform .35s var(--spring), visibility 0s linear .35s;
   }
   .hall-cap.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity .2s ease, transform .35s var(--spring), visibility 0s; }
-  .cap-body { min-width: 0; text-align: center; }
+  .cap-body { grid-area: body; min-width: 0; text-align: center; }
+  #capPrev { grid-area: prev; } #capNext { grid-area: next; }
   .index { font: 600 10.5px/1 var(--font); letter-spacing: .16em; text-transform: uppercase; color: var(--shu); font-variant-numeric: tabular-nums; }
-  .cap-task { margin: 7px 0 5px; font: 600 19px/1.25 var(--display); letter-spacing: -.02em; text-wrap: balance; overflow-wrap: anywhere; }
+  .cap-task {
+    margin: 7px 0 5px; font: 600 19px/1.25 var(--display); letter-spacing: -.02em; text-wrap: balance; overflow-wrap: anywhere;
+    max-height: 3.75em; overflow-y: auto; scrollbar-width: thin;   /* at most three lines under the doll; a longer task scrolls */
+  }
+  /* in a wide window the caption is a label beside the doll, with room for a long task */
+  .hall-win.side .hall-cap {
+    left: auto; right: max(28px, 6%); top: 52%; bottom: auto; width: min(340px, 36%);
+    grid-template-columns: auto 1fr auto; grid-template-areas: "body body body" "prev . next";
+    row-gap: 16px; padding: 22px 18px 16px 22px; transform: translate(14px, -50%);
+  }
+  .hall-win.side .hall-cap.show { transform: translate(0, -50%); }
+  .hall-win.side .cap-body { text-align: left; }
+  .hall-win.side .cap-task { margin: 10px 0 8px; font-size: 22px; line-height: 1.22; text-wrap: pretty; max-height: min(11em, 42vh); }
   .cap-meta { margin: 0; font: 400 12.5px/1.4 var(--font); color: var(--ink-2); font-variant-numeric: tabular-nums; }
   .nav {
     width: 38px; height: 38px; padding: 0; border: 0; border-radius: 19px; cursor: pointer; display: grid; place-items: center;
@@ -259,6 +275,7 @@
   }
   .hall-tip {
     position: absolute; z-index: 3; max-width: 240px; padding: 7px 11px; border-radius: 12px; pointer-events: none;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;   /* one line, cut short */
     font: 600 12.5px/1.3 var(--font); background: rgba(255, 255, 255, .9); box-shadow: var(--edge), var(--shadow-1);
     transform: translate(-50%, -100%); text-align: center;
     opacity: 0; transition: opacity .12s ease;
@@ -2346,7 +2363,12 @@ const Hall = (() => {
   }
   // the stand for a chosen doll: low in the middle of the view, well in front of the ledges
   function placeSpot(dist) {
-    ndc.set(0, -.52); ray.setFromCamera(ndc, cam);
+    // in a wide window the doll steps out to the left of the middle, its label beside it; else above the caption
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    layout.side = w >= 760 && w / h >= 1.15;
+    win.classList.toggle('side', layout.side);
+    if (layout.side) ndc.set(-.3, -.46); else ndc.set(0, -.52);
+    ray.setFromCamera(ndc, cam);
     const fwd = cam.getWorldDirection(new THREE.Vector3()), d = dist * .55;
     const P = ray.ray.at(d / ray.ray.direction.dot(fwd), new THREE.Vector3());
     layout.spot.copy(P);
