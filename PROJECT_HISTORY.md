@@ -8,10 +8,11 @@ This file records how the project came to be, conversation by conversation, what
 
 | | |
 |---|---|
-| Repository | https://github.com/ashub98-png/daruma-desk (private), branch `main` |
+| Repository | https://github.com/ashub98-png/daruma-desk (public), branch `main` |
+| Download | [GitHub releases](https://github.com/ashub98-png/daruma-desk/releases/latest): one `.dmg` for Apple Silicon and Intel, macOS 13 or later |
 | Browser prototype | `index.html`, opened directly in Chrome or Safari |
 | Desktop app | macOS menu bar app, Electron 45.1, version 1.0.0 |
-| Installer | `dist/Daruma Desk-1.0.0-arm64.dmg` (Apple Silicon, ad-hoc signed, not notarized) |
+| Installer | `dist/Daruma Desk-1.0.0-universal.dmg` (Apple Silicon and Intel, ad-hoc signed, not notarized) |
 | Installed copy | `/Applications/Daruma Desk.app` |
 | Main code | `index.html` (about 2,600 lines: page, styles and three.js scenes) |
 | App shell | `app/main.js`, `app/preload.js`, `app/helper.swift` |
@@ -178,7 +179,7 @@ These rules came out of the back-and-forth above and should guide future changes
 ```bash
 npm install
 npm start          # compiles the helper, runs the app
-npm run dist       # compiles the helper, builds dist/Daruma Desk-1.0.0-arm64.dmg
+npm run dist       # compiles the helper for both chips, builds dist/Daruma Desk-1.0.0-universal.dmg
 ```
 
 - The browser prototype needs nothing: open `index.html`.
@@ -193,8 +194,8 @@ npm run dist       # compiles the helper, builds dist/Daruma Desk-1.0.0-arm64.dm
 - The untinted blur relies on how macOS 26 builds its blur internally. A future macOS could change that and bring the haze back.
 - The Dock check relies on the Dock's window being on the window server's on-screen list. It was verified on this Mac with the Dock showing, and in a simulated hidden state; full-screen behaviour was confirmed by the window list but not watched on screen.
 - Only the primary display is used.
-- The app is Apple Silicon only, ad-hoc signed and not notarized. Sharing it widely would need a Developer ID and notarization, or a universal build.
-- The `.dmg` is not in the repository. It could be attached to a GitHub release.
+- The app is ad-hoc signed and not notarized, so other Macs block it the first time (System Settings › Privacy & Security › Open Anyway). Removing that step needs a Developer ID and notarization.
+- The universal build was tested natively on Apple Silicon and under Rosetta, not on a real Intel Mac.
 - No automated tests live in the repo yet.
 - Possible next steps: due dates or reminders that nudge a doll, more than one row on small screens, export or backup of tasks, and Windows support.
 

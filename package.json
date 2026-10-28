@@ -9,8 +9,8 @@
   "main": "app/main.js",
   "scripts": {
     "start": "npm run helper && electron .",
-    "dist": "npm run helper && electron-builder --mac dmg",
-    "helper": "swiftc -O app/helper.swift -o build/helper"
+    "dist": "npm run helper && electron-builder --mac",
+    "helper": "swiftc -O -target arm64-apple-macos13 app/helper.swift -o build/helper-arm64 && swiftc -O -target x86_64-apple-macos13 app/helper.swift -o build/helper-x64 && lipo -create build/helper-arm64 build/helper-x64 -output build/helper"
   },
   "build": {
     "appId": "io.github.ashub98-png.daruma-desk",
@@ -27,7 +27,7 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64"
+            "universal"
           ]
         }
       ],
@@ -35,7 +35,9 @@
         "LSUIElement": true
       },
       "identity": "-",
-      "hardenedRuntime": false
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "13.0",
+      "x64ArchFiles": "Contents/Resources/helper"
     },
     "dmg": {
       "title": "Daruma Desk"
